@@ -19,25 +19,13 @@ class Hagent
     @desc[:inputs].each_pair do |name, pin|
       pin.mode = :input
     end
-
-    # auto monitoring sensors
-    @desc[:sensors].each_pair do |name, sensor|
-      if sensor.kind_of? DS18B20
-        Catcher.thread "ds18b20 reads" do
-          loop do
-            read(name, cache: false)
-            sleep 2
-          end
-        end
-      end
-    end
   end
 
   def set(name, value = true)
     name = name.to_sym
 
     if @desc[:outputs].keys.include? name
-      @desc[:outputs].set value
+      @desc[:outputs][name].set value
     end
   end
 
@@ -48,7 +36,7 @@ class Hagent
       # no caching for binary inptuts
     elsif @desc[:sensors][name]
       # TODO cache by default may be suboptimal uze #lazy_read or smthg?
-      return @last_values[name][1] if opts[:cache] != false && @last_values[name] && (@last_values[name][0] < Time.now - @opts[:cache_time])
+      return @last_values[name][1] if opts[:cache] != false && @last_values[name] && (@last_values[name][0] > Time.now - @opts[:cache_time])
     else
       raise "no such output/sensor"
     end
@@ -72,10 +60,16 @@ class Hagent
   def on_change(opts = {}, &block)
     if opts.kind_of? Symbol
       name = opts.to_sym
-      if @desc[:inputs][name]
-        @desc[:inputs][name].on_change do
+
+      # TODO assumption thath all inputs and sensors implement on_change
+      pin = @desc[:inputs][name] || @desc[:sensors][name]
+      if pin
+        pin.on_change do
+          # TODO @last_values cache shit
           block.call
         end
+      else
+        raise "no such pin"
       end
     end
   end
@@ -101,7 +95,7 @@ description = {
   },
 
   sensors: {
-    temp: ds
+    t1: ds
   }
 }
 
@@ -117,8 +111,15 @@ prs pcf
 
 puts "HA state:"
 ap ha.state
+ha.on_change(:t1) do
+  puts "T1: #{ha.read :t1, cache: false}"
+end
 ha.on_change(:swo1) do
-  ap ha.state
+  puts "CHANGE!"
+  ha.set :o2, ha.read(:swo1)
+  ha.set :o1, ha.read(:swo1)
+  sleep 2
+  ha.set :o1, false
 end
 
 sleep

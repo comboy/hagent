@@ -33,7 +33,7 @@ class Hagent
       end
 
       def read
-        value
+        !value
       end
 
       def set(value)
@@ -56,7 +56,6 @@ class Hagent
           begin
             loop do
               `gpio wfi #{@int} both`
-              puts "HEM"
               prev_state = @state
               sleep 0.01
               @state = read_state
@@ -105,7 +104,6 @@ class Hagent
       @pins.each_with_index do |pin, i|
         inputs_mask = inputs_mask | 1 << i if pin.input?
       end
-      puts "im: #{inputs_mask.to_s(2)}"
       # We use inputs_mask to make sure input pins are always set high
       # (even if they are reading low at the moment)
       @state = new_state
@@ -113,7 +111,7 @@ class Hagent
     end
 
     def ex(cmd)
-      puts "ex: #{cmd}"
+      #puts "ex: #{cmd}"
       `#{cmd}`
     end
   end
