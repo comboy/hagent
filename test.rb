@@ -1,29 +1,82 @@
+require 'catcher'
+require 'awesome_print'
+
 $: << "."
 require 'pcf8574'
 require 'ds18b20'
 
 class Hagent
 
-  def initialize(description)
-    @desc = description
-    @last_reads = {}
+  DEFAULT_OPTS = {
+    cache_time: 5
+  }
 
+  def initialize(description, opts = {})
+    @desc = {inputs: {}, outputs: {}, sensors: {}}.merge description
+    @last_values = {}
+
+    @opts = DEFAULT_OPTS.merge opts
     @desc[:inputs].each_pair do |name, pin|
       pin.mode = :input
     end
+
+    # auto monitoring sensors
+    @desc[:sensors].each_pair do |name, sensor|
+      if sensor.kind_of? DS18B20
+        Catcher.thread "ds18b20 reads" do
+          loop do
+            read(name, cache: false)
+            sleep 2
+          end
+        end
+      end
+    end
   end
 
-  def set(pin, value = true)
-    pin = pin.to_sym
+  def set(name, value = true)
+    name = name.to_sym
 
-    if @desc[:outputs].keys.include? pin
-      @desc[:outputs][pin.to_sym].set true
+    if @desc[:outputs].keys.include? name
+      @desc[:outputs].set value
     end
+  end
+
+  def read(name, opts = {})
+    name = name.to_sym
+
+    if @desc[:inputs][name]
+      # no caching for binary inptuts
+    elsif @desc[:sensors][name]
+      # TODO cache by default may be suboptimal uze #lazy_read or smthg?
+      return @last_values[name][1] if opts[:cache] != false && @last_values[name] && (@last_values[name][0] < Time.now - @opts[:cache_time])
+    else
+      raise "no such output/sensor"
+    end
+
+    pin = @desc[:inputs][name] || @desc[:sensors][name]
+
+    value = pin.read
+    @last_values[name] ||= []
+    @last_values[name][0] = Time.now
+    @last_values[name][1] = value
+    value
+  end
+
+  def state
+    ret  = {}
+    ret[:inputs] = Hash[*@desc[:inputs].map {|k,v| [k, read(k)]}.flatten ]
+    ret[:sensors] = Hash[*@desc[:sensors].map {|k,v| [k, read(k)]}.flatten ]
+    ret
   end
 
   def on_change(opts = {}, &block)
     if opts.kind_of? Symbol
-      @desc[:outputs]
+      name = opts.to_sym
+      if @desc[:inputs][name]
+        @desc[:inputs][name].on_change do
+          block.call
+        end
+      end
     end
   end
 end
@@ -62,32 +115,32 @@ end
 
 prs pcf
 
+puts "HA state:"
+ap ha.state
+ha.on_change(:swo1) do
+  ap ha.state
+end
+
+sleep
+exit 0
 
 pcf.on_change do |oldstate|
   puts "change"
 end
 pcf.pin(6).on_change do
   puts "pin 6 change [#{pcf.pin(6).value}]"
-
   pcf.pin(0).set pcf.pin(6).value
 end
 
 #loop do
 #  puts ds.read
 #end
-gets
-loop do
-  8.times do |i|
-    pcf.pin(i).set false
+
+20.times do
+  %w{o1 o2 o3 o4}.each do |pin|
+    ha.set pin, true
     sleep 0.02
-    pcf.pin(i).set true
+    ha.set pin, false
   end
-  #pcf.pin(1).set false
-  #sleep 0.1
-  #pcf.pin(1).set true
-  #sleep 1
 end
-
-
-#sleep 5
 

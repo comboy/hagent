@@ -1,8 +1,6 @@
 class Hagent
   class PCF8574
     class Pin
-      attr_reader :value
-
       def initialize(pcf, number)
         @pcf = pcf
         @number = number
@@ -24,7 +22,6 @@ class Hagent
 
       def input?
         @mode == :input
-
       end
 
       def mode=(mode)
@@ -33,6 +30,10 @@ class Hagent
 
       def value(state = nil)
         (state || @pcf.state) & 1 << @number > 0
+      end
+
+      def read
+        value
       end
 
       def set(value)
@@ -86,6 +87,8 @@ class Hagent
     end
 
     def pin_set(pin, value)
+      # let's default to negation for PCF since output on will always be low
+      value = !value
       new_state = @state
       new_state = @state ^ 1 << pin if ((@state & 1 << pin) > 0) != value
       puts "oldstate: #{@state}, newstate: #{new_state}"
