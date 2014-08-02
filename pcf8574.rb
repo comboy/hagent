@@ -90,7 +90,7 @@ class Hagent
       value = !value
       new_state = @state
       new_state = @state ^ 1 << pin if ((@state & 1 << pin) > 0) != value
-      puts "oldstate: #{@state}, newstate: #{new_state}"
+      #puts "oldstate: #{@state}, newstate: #{new_state}"
       write_state(new_state)
     end
 
