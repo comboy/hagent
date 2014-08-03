@@ -3,8 +3,8 @@ require 'awesome_print'
 
 $: << "."
 require 'pcf8574'
-require 'ds18b20'
-require 'dht22'
+require 'sensor/ds18b20'
+require 'sensor/dht22'
 
 class Hagent
 
