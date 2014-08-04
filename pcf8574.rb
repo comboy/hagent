@@ -52,15 +52,19 @@ class Hagent
       puts "state: #{@state}"
       @on_change_blocks = []
       if @int
+        system("gpio -g mode #{@int} in")
         Thread.new do
           begin
             loop do
-              `gpio wfi #{@int} both`
+              `gpio -g wfi #{@int} both`
               prev_state = @state
               sleep 0.01
               @state = read_state
-              Thread.new do
-                @on_change_blocks.each {|b| b.call(prev_state) }
+              if @state != prev_state # in case many PCFs are connected to single interrupt
+                Catcher.thread "pcf on change blocks" do
+                  #puts "change!: #{@state}"
+                  @on_change_blocks.each {|b| b.call(prev_state) }
+                end
               end
             end
           rescue Exception => e
@@ -77,7 +81,7 @@ class Hagent
     def read_state
       raw = ex "i2cget -y #{@i2cbus} #{@addr}"
       state = raw.split('x').last.to_i(16)
-      puts "read state: #{state.to_s(2)}"
+      #puts "read state: #{state.to_s(2)}"
       state
     end
 

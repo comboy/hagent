@@ -5,6 +5,7 @@ $: << "."
 require 'pcf8574'
 require 'sensor/ds18b20'
 require 'sensor/dht22'
+require 'sensor/light'
 
 class Hagent
 
@@ -74,5 +75,28 @@ class Hagent
       end
     end
   end
+
+  def connect(input, output)
+    on_change input do
+      state = read input
+      set output, state
+    end
+  end
+
+
+  # Utils, move to some utils.rb
+  #
+
+  def debug_inputs
+    puts "WHY"
+    @desc[:inputs].each_pair do |name, pin|
+      name = name.to_sym
+      pin.on_change do
+        state = read name
+        puts "DS: #{name} = #{state}"
+      end
+    end
+  end
+
 end
 
