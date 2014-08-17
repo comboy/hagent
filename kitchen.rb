@@ -20,9 +20,9 @@ description = {
     swo3: pcf.pin(2),
     nc1: pcf.pin(3),
 
-    nc21: pcf2.pin(1),
-    nc22: pcf2.pin(2),
-    nc23: pcf2.pin(3),
+    sw_red: pcf2.pin(1),
+    sw_green: pcf2.pin(2),
+    sw_yellow: pcf2.pin(3),
 
     sw_okap1: pcf3.pin(0),
     sw_okap_light: pcf3.pin(1),
@@ -58,6 +58,30 @@ description = {
     light: light
   }
 }
+
+class Music
+  def initialize
+    @pid = nil
+  end
+
+  def playing?
+    !! @pid
+  end
+
+  def start
+    @pid = fork do
+      exec("mplayer http://publish.acdn.smcloud.net:8000/t041-1.mp3 -really-quiet")
+    end
+  end
+
+  def stop
+    Process.kill "TERM", @pid
+    Process.wait @pid
+    @pid = nil
+  end
+end
+
+music = Music.new
 
 ha = Hagent.new description
 
@@ -130,7 +154,20 @@ ap ha.state
 
 ha.debug_inputs
 
-ha.connect :sw_okap_light, :light_neon
+#ha.connect :sw_okap_light, :light_neon
+
+ha.connect :sw_green, :light_neon
+ha.connect :sw_yellow, :light_up
+#ha.connect :sw_red, :light_okap
+ha.connect :sw_okap_light, :light_okap
+
+ha.on_change :sw_red do
+  if music.playing?
+    music.stop
+  else
+    music.start
+  end
+end
 
 ha.connect :sw_okap1, :okap1
 ha.connect :sw_okap2, :okap2
@@ -168,9 +205,9 @@ ha.on_change(:h_okap) do
   puts "H_UP: #{ha.read :h_up, cache: false} \t H_OKAP: #{ha.read :h_okap, cache: false}"
 end
 
-#ha.on_change(:light) do
-#  puts "Light: #{ha.read :light, cache: false}"
-#end
+ha.on_change(:light) do
+  puts "Light: #{ha.read :light, cache: false}"
+end
 sleep
 exit 0
 
