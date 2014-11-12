@@ -1,4 +1,5 @@
 require_relative 'hagent'
+require_relative '../komoku/lib/komoku/agent'
 
 
 pcf = Hagent::PCF8574.new(addr: '0x20', int: 27) # TODO which INT, int: 0)
@@ -84,6 +85,8 @@ end
 music = Music.new
 
 ha = Hagent.new description
+ka = Komoku::Agent.new server: 'ws://10.7.0.10:7272/'
+ka.connect
 
 def prs(pcf)
   8.times do |i|
@@ -180,6 +183,7 @@ ha.on_change(:t_okap) do
   tup = ha.read :t_up, cache:false
   tokap = ha.read :t_okap, cache:false
   puts "T_UP: #{tup} \t T_OKAP: #{tokap}"
+  ka.put :temp_up, tup
   #if tokap > tup
   #  ha.set :okap3, true
   #else
@@ -190,6 +194,7 @@ ha.on_change(:t_up) do
   tup = ha.read :t_up, cache:false
   tokap = ha.read :t_okap, cache:false
   puts "T_UP: #{tup} \t T_OKAP: #{tokap}"
+  ka.put :temp_hood, tokap
   #if tokap > tup
   #  ha.set :okap3, true
   #else
@@ -198,15 +203,23 @@ ha.on_change(:t_up) do
 end
 
 ha.on_change(:h_up) do
-  puts "H_UP: #{ha.read :h_up, cache: false} \t H_OKAP: #{ha.read :h_okap, cache: false}"
+  h_up = ha.read :h_up, cache: false
+  h_okap = ha.read :h_okap, cache: false
+  puts "H_UP: #{h_up} \t H_OKAP: #{h_okap}"
+  ka.put :hum_up, h_up
 end
 
 ha.on_change(:h_okap) do
-  puts "H_UP: #{ha.read :h_up, cache: false} \t H_OKAP: #{ha.read :h_okap, cache: false}"
+  h_up = ha.read :h_up, cache: false
+  h_okap = ha.read :h_okap, cache: false
+  puts "H_UP: #{h_up} \t H_OKAP: #{h_okap}"
+  ka.put :hum_hood, h_okap
 end
 
 ha.on_change(:light) do
-  puts "Light: #{ha.read :light, cache: false}"
+  light = ha.read :light, cache: false
+  puts "Light: #{light}"
+  ka.put :light, light
 end
 sleep
 exit 0
