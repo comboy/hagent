@@ -63,22 +63,56 @@ description = {
 class Music
   def initialize
     @pid = nil
+    #@thread = respawn_thread
+    @stream_idx = 0
   end
 
   def playing?
     !! @pid
   end
 
-  def start
+  def start(no_thread = false)
+    #@thread = respawn_thread unless no_thread
     @pid = fork do
-      exec("mplayer http://publish.acdn.smcloud.net:8000/t041-1.mp3 -really-quiet")
+      exec("mplayer '#{streams[@stream_idx]}' -really-quiet")
     end
   end
 
+  def next
+    @stream_idx += 1
+    @stream_idx = 0 if @stream_idx >= streams.size
+  end
+
   def stop
-    Process.kill "TERM", @pid
-    Process.wait @pid
+    puts "STAHP"
+    pid = @pid
     @pid = nil
+    #@thread.kill
+    system("killall -9 mplayer") # TMP TODO FIXME
+    #Process.kill "TERM", pid
+    #Process.wait pid
+  end
+
+  def streams
+    [
+      'http://ant-kra-01.cdn.eurozet.pl:8606/'
+      #'http://stream.polskieradio.pl/program3'
+    ]
+  end
+
+  protected
+
+  def respawn_thread
+    Catcher.thread "mplayer respawning" do
+      loop do
+        sleep 2
+        if playing? && @pid
+          Process.wait @pid
+          puts "MPLAYER DIED"
+          start true
+        end
+      end
+    end
   end
 end
 
@@ -166,9 +200,16 @@ ha.connect :sw_okap_light, :light_okap
 
 ha.on_change :sw_red do
   if music.playing?
+    #$last_sw_red = Time.now
     music.stop
   else
+    #if $last_sw_red && ((Time.now - $last_sw_red) < 1)
+    #  puts "MPLAYER  NEXT"
+    #end
     music.start
+    ha.set :notify_buzz, true
+    sleep 0.1
+    ha.set :notify_buzz, false
   end
 end
 
