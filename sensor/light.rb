@@ -5,7 +5,7 @@ class Hagent
     class Light < Base
       def initialize(opts = {})
         @pin = opts[:pin]
-        opts[:read_interval] ||= 1
+        opts[:read_interval] ||= 200
         super
       end
 
@@ -25,7 +25,8 @@ class Hagent
         end
         #system("gpio -g wfi #{@pin} both")
         t = Time.now - t0
-        (t * 1000.0).to_i
+        ret = (t * 1000.0).to_i
+        (1 / ret.to_f * 1000).round(2)
       end
     end
   end

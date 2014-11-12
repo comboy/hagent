@@ -14,7 +14,7 @@ class Hagent
  
       def read_sensor
         lines = File.read("/sys/bus/w1/devices/#{@addr}/w1_slave").split("\n")
-        raise "nope" unless lines[0].match /YES$/
+        return nil unless lines[0].match /YES$/
         lines[1].match(/t=(\d+)/)[1].to_i / 1_000.0
       end
     end

@@ -5,7 +5,7 @@ class Hagent
     class DHT22 < Base
       def initialize(opts = {})
         @pin = opts[:pin]
-        opts[:read_interval] ||= 2
+        opts[:read_interval] ||= 20
         super
       end
 
