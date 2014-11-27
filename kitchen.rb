@@ -1,5 +1,5 @@
 require_relative 'hagent'
-require_relative '../komoku/lib/komoku/agent'
+require_relative '../komoku/komoku-core/lib/komoku/agent'
 
 
 pcf = Hagent::PCF8574.new(addr: '0x20', int: 27) # TODO which INT, int: 0)
@@ -118,9 +118,10 @@ end
 
 music = Music.new
 
-ha = Hagent.new description
-ka = Komoku::Agent.new server: 'ws://10.7.0.10:7272/'
+ka = Komoku::Agent.new server: 'ws://10.7.0.10:7272/', reconnect: true
 ka.connect
+ka.logger = Logger.new STDOUT
+ha = Hagent.new description
 
 def prs(pcf)
   8.times do |i|
@@ -198,19 +199,41 @@ ha.connect :sw_yellow, :light_up
 #ha.connect :sw_red, :light_okap
 ha.connect :sw_okap_light, :light_okap
 
+%i{light_up light_okap light_neon}.each do |light|
+  ka.on_change light do |key, prev, curr|
+    ha.set light, curr if ha.last_set(light) != curr
+  end
+
+  ha.on_set light do |value|
+    ka.put light, value
+  end
+end
+
 ha.on_change :sw_red do
   if music.playing?
     #$last_sw_red = Time.now
-    music.stop
+    ka.put :radio_on, false
   else
     #if $last_sw_red && ((Time.now - $last_sw_red) < 1)
     #  puts "MPLAYER  NEXT"
     #end
-    music.start
+    ka.put :radio_on, true
     ha.set :notify_buzz, true
     sleep 0.1
     ha.set :notify_buzz, false
   end
+end
+
+ka.on_change(:radio_on) do |key, prev, curr|
+  if curr && !music.playing?
+    music.start
+  else
+    music.stop
+  end
+end
+
+ka.on_change(:radio_volume) do |key, prev, curr|
+  system("amixer set PCM #{curr}%")
 end
 
 ha.connect :sw_okap1, :okap1
