@@ -44,6 +44,9 @@ class Hagent
     end
   end
 
+  def report_sensors(pairing)
+  end
+
   def last_set(name)
     name = name.to_sym
     @last_set[name]
@@ -94,10 +97,19 @@ class Hagent
     end
   end
 
-  def connect(input, output)
+  # Position of the switch irrelevant, state toggles on change
+  def toggle_switch(input, output)
     on_change input do
       sleep 0.01 # almost switch debounce ;)
       set output, !last_set(output)
+    end
+  end
+
+  # Switch position decides the state
+  def direct_switch(input, output)
+    on_change input do
+      state = read input
+      set output, state
     end
   end
 

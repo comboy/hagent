@@ -25,10 +25,10 @@ description = {
     sw_green: pcf2.pin(2),
     sw_yellow: pcf2.pin(3),
 
-    sw_okap1: pcf3.pin(0),
-    sw_okap_light: pcf3.pin(1),
-    sw_okap2: pcf3.pin(2),
-    sw_okap3: pcf3.pin(3),
+    sw_hood1: pcf3.pin(0),
+    sw_hood_light: pcf3.pin(1),
+    sw_hood2: pcf3.pin(2),
+    sw_hood3: pcf3.pin(3),
     nc35: pcf3.pin(4),
   },
 
@@ -41,21 +41,21 @@ description = {
     status_green: pcf2.pin(0),
     status_yellow: pcf2.pin(4),
 
-    okap2: pcf2.pin(5),
-    okap3: pcf2.pin(6),
-    okap1: pcf2.pin(7),
+    hood2: pcf2.pin(5),
+    hood3: pcf2.pin(6),
+    hood1: pcf2.pin(7),
 
     light_up: pcf3.pin(5),
     light_neon: pcf3.pin(6),
-    light_okap: pcf3.pin(7),
+    light_hood: pcf3.pin(7),
   },
 
   sensors: {
-    t1: ds,
-    t_okap: ds2,
-    t_up: ds3,
-    h_okap: dht1,
-    h_up: dht2,
+    temp_internal: ds,
+    temp_hood: ds2,
+    temp_up: ds3,
+    hum_hood: dht1,
+    hum_up: dht2,
     light: light
   }
 }
@@ -118,10 +118,12 @@ end
 
 music = Music.new
 
-ka = Komoku::Agent.new server: 'ws://10.7.0.10:7272/', reconnect: true
+ka = Komoku::Agent.new server: 'ws://10.7.0.10:7272/', reconnect: true, async: true
 ka.connect
 ka.logger = Logger.new STDOUT
-ha = Hagent.new description
+ka.logger.level = Logger::INFO
+
+ha = Hagent.new description, komoku_agent: ka
 
 def prs(pcf)
   8.times do |i|
@@ -131,83 +133,66 @@ end
 
 prs pcf
 
-Thread.new do
-  loop do
-    ha.set :status_green, true
-    sleep 0.1
-    ha.set :status_green, false
-    sleep 0.1
-    ha.set :status_green, true
-    sleep 0.1
-    ha.set :status_green, false
-    sleep 0.5
-  end
-end
-Thread.new do
-  loop do
-    if !system("ping -c 1 192.168.1.1 > /dev/null")
-      ha.set :status_yellow, false
-      sleep 0.5
-      ha.set :status_yellow, true
-      sleep 0.5
-    else
-      ha.set :status_yellow, false
-      sleep 2
-    end
-  end
-end
-
-puts "pstryk"
+# startup light
 1.times do
-  %w{okap3 okap1 okap2}.each do |pin| #notify_buzz
-    ha.set pin, true
-    sleep 2 
-    ha.set pin, false
-  end
-end if false
-puts
-1.times do
-  %w{light1 light2 light3}.each do |pin| #notify_buzz
-    puts "  #{pin}"
-    ha.set pin, true
-    sleep 5 
-    ha.set pin, false
-    sleep 0.1
-  end
-end if false
-
-puts "done"
-
-
-1.times do
-  %w{notify_green notify_red notify_blue}.each do |pin| #notify_buzz
+  %w{notify_green notify_red notify_blue}.each do |pin|
     ha.set pin, true
     sleep 0.5 
     ha.set pin, false
   end
 end
 
+# Heartbeat light
+Thread.new do loop do
+  ha.set :status_green, true; sleep 0.1; ha.set :status_green, false; sleep 0.1
+  ha.set :status_green, true; sleep 0.1; ha.set :status_green, false; sleep 0.5
+end end
+
+# connection lost light
+Thread.new do loop do
+  if !system("ping -c 1 192.168.1.1 > /dev/null")
+    ha.set :status_yellow, false; sleep 0.5; ha.set :status_yellow, true; sleep 0.5
+  else
+    ha.set :status_yellow, false; sleep 2
+  end
+end end
+
 puts "HA state:"
 ap ha.state
 
 ha.debug_inputs
 
-#ha.connect :sw_okap_light, :light_neon
-
-ha.connect :sw_green, :light_neon
-ha.connect :sw_yellow, :light_up
-#ha.connect :sw_red, :light_okap
-ha.connect :sw_okap_light, :light_okap
-
-%i{light_up light_okap light_neon}.each do |light|
-  ka.on_change light do |key, prev, curr|
-    ha.set light, curr if ha.last_set(light) != curr
-  end
-
-  ha.on_set light do |value|
-    ka.put light, value
+# Komoku sensors
+%i{temp_internal temp_up temp_hood light hum_hood hum_up}.each do |sensor|
+  ha.on_change(sensor) do
+    value = ha.read sensor, cache: false
+    ka.put sensor, value
   end
 end
+
+# Buttons, switches
+ha.direct_switch :sw_hood1, :hood1
+ha.direct_switch :sw_hood2, :hood2
+ha.direct_switch :sw_hood3, :hood3
+ha.direct_switch :sw_hood_light, :light_hood
+
+ha.toggle_switch :sw_green, :light_neon
+ha.toggle_switch :sw_yellow, :light_up
+
+# Komoku outputs
+%i{light_up light_hood light_neon}.each do |output|
+  # sync with komoku on boot
+  ha.set(output, !!ka.get(output))
+
+  # keep komoku up to date
+  ha.on_set(output) {|value| ka.put output, value}
+
+  # keep state from komoku
+  ka.on_change(output) do |key, curr, prev|
+    ha.set output, curr if ha.last_set(output) != curr
+  end
+end
+
 
 ha.on_change :sw_red do
   if music.playing?
@@ -224,7 +209,7 @@ ha.on_change :sw_red do
   end
 end
 
-ka.on_change(:radio_on) do |key, prev, curr|
+ka.on_change(:radio_on) do |key, curr, prev|
   if curr && !music.playing?
     music.start
   else
@@ -232,60 +217,12 @@ ka.on_change(:radio_on) do |key, prev, curr|
   end
 end
 
-ka.on_change(:radio_volume) do |key, prev, curr|
+ka.on_change(:radio_volume) do |key, curr, prev|
   system("amixer set PCM #{curr}%")
 end
 
-ha.connect :sw_okap1, :okap1
-ha.connect :sw_okap2, :okap2
-ha.connect :sw_okap3, :okap3
-
-ha.on_change(:t1) do
-  puts "T1: #{ha.read :t1, cache: false}"
-end
-ha.on_change(:t_okap) do
-  tup = ha.read :t_up, cache:false
-  tokap = ha.read :t_okap, cache:false
-  puts "T_UP: #{tup} \t T_OKAP: #{tokap}"
-  ka.put :temp_up, tup
-  #if tokap > tup
-  #  ha.set :okap3, true
-  #else
-  #  ha.set :okap3, false
-  #end
-end
-ha.on_change(:t_up) do
-  tup = ha.read :t_up, cache:false
-  tokap = ha.read :t_okap, cache:false
-  puts "T_UP: #{tup} \t T_OKAP: #{tokap}"
-  ka.put :temp_hood, tokap
-  #if tokap > tup
-  #  ha.set :okap3, true
-  #else
-  #  ha.set :okap3, false
-  #end
-end
-
-ha.on_change(:h_up) do
-  h_up = ha.read :h_up, cache: false
-  h_okap = ha.read :h_okap, cache: false
-  puts "H_UP: #{h_up} \t H_OKAP: #{h_okap}"
-  ka.put :hum_up, h_up
-end
-
-ha.on_change(:h_okap) do
-  h_up = ha.read :h_up, cache: false
-  h_okap = ha.read :h_okap, cache: false
-  puts "H_UP: #{h_up} \t H_OKAP: #{h_okap}"
-  ka.put :hum_hood, h_okap
-end
-
-ha.on_change(:light) do
-  light = ha.read :light, cache: false
-  puts "Light: #{light}"
-  ka.put :light, light
-end
 sleep
+
 exit 0
 
 pcf.on_change do |oldstate|
