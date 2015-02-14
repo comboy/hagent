@@ -6,6 +6,8 @@ require 'pcf8574'
 require 'sensor/ds18b20'
 require 'sensor/dht22'
 require 'sensor/light'
+require 'ard_light'
+require 'rpi'
 
 class Hagent
 
@@ -33,7 +35,7 @@ class Hagent
       @desc[:outputs][name].set value
       @last_set[name] = value
 
-      if @on_set_blocks[name]
+      if !Thread.current[:hagent_without_callbacks] && @on_set_blocks[name]
         # probably should only be called when value is differnt
         @on_set_blocks[name].each do |block|
           Catcher.thread "hagent on set blocks" do
@@ -49,6 +51,7 @@ class Hagent
 
   def last_set(name)
     name = name.to_sym
+    return @desc[:outputs][name].read if @desc[:outputs][name].respond_to?(:read)
     @last_set[name]
   end
 
@@ -95,6 +98,12 @@ class Hagent
         raise "no such pin"
       end
     end
+  end
+
+  def without_callbacks
+    Thread.current[:hagent_without_callbacks] = true
+    yield
+    Thread.current[:hagent_without_callbacks] = false
   end
 
   # Position of the switch irrelevant, state toggles on change

@@ -11,6 +11,9 @@ int swPins[] = {
    9,  8
 };
 
+// because why bother soldering it correctly
+bool reverseFix[] = {false, false, false, true};
+
 int swState[swCount];
 int outState[swCount];
 
@@ -25,12 +28,12 @@ int ledAuto = 11;
 int lightSensor = A1;
 
 #define B_PING  46
-#define B_COUNT 63
+#define B_HELLO 63
 #define B_LIGHT 90
 
 #define R_ERR    33
 #define R_ACK    46
-#define R_COUNT  63
+#define R_HELLO  63
 #define R_LIGHT  90
 
 // time without ping after which it switches to autonomous mode
@@ -73,6 +76,14 @@ bool isAutonomous() {
   return (lastPing == 0 || lastPing < (millis() - AUTO_TIME));
 }
 
+void sendOutState(int swNum) {
+  int state = outState[swNum];
+  if (reverseFix[swNum]) {
+    state = !state;
+  }
+  Serial.write(100 + swNum*4 + 2 + state);
+}
+
 void loop() {
 
   if (Serial.available() > 0) {
@@ -85,9 +96,14 @@ void loop() {
     }
 
     // how many light switches
-    if (sb == B_COUNT) {
-      Serial.write(R_COUNT);
+    if (sb == B_HELLO) {
+      Serial.write(R_HELLO);
       Serial.println(swCount);
+      // report switches and light state
+      for(int i=0; i< swCount; i++) {
+        Serial.write(100 + i*4 + swState[i]);
+        sendOutState(i);
+      }
     }
 
     // analog read of photo resistor
@@ -100,11 +116,11 @@ void loop() {
     // light relays
     for(int i=0; i< swCount; i++) {
       if (sb == 100 + i*4 + 2) { // turn off
-        setOut(i, LOW);
+        setOut(i, reverseFix[i] ? HIGH : LOW);
         Serial.write(sb);
       }
       if (sb == 100 + i*4 + 3) { // turn on
-        setOut(i, HIGH);
+        setOut(i, reverseFix[i] ? LOW : HIGH);
         Serial.write(sb);
       }
     }
