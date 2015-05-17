@@ -10,6 +10,9 @@ class Hagent
     C_VENT_ON     = 22
     C_VENT_OFF    = 23
 
+    C_BLUE_ON     = 6
+    C_BLUE_OFF    = 7
+
     R_ACK = 1337
 
     class Sensor < Hagent::Sensor::Base
@@ -62,6 +65,11 @@ class Hagent
 
     def vent
       @vent ||= Output.new rf: @rf, commands: [C_VENT_ON, C_VENT_OFF]
+      @vent ||= Output.new rf: @rf, commands: [C_VENT_ON, C_VENT_OFF]
+    end
+
+    def led_blue
+      @blue ||= Output.new rf: @rf, commands: [C_BLUE_ON, C_BLUE_OFF]
     end
   end
 end

@@ -37,7 +37,7 @@ description = {
     notify_blue: pcf.pin(4),
     notify_red: pcf.pin(5),
     notify_buzz: pcf.pin(7),
- 
+
     status_green: pcf2.pin(0),
     status_yellow: pcf2.pin(4),
 
@@ -72,9 +72,12 @@ class Music
   end
 
   def start(no_thread = false)
+    station = $ka.get('radio_station')
+    url = streams[station]
+    puts "GONNA START #{station} = #{url}"
     #@thread = respawn_thread unless no_thread
     @pid = fork do
-      exec("mplayer '#{streams[@stream_idx]}' -really-quiet")
+      exec("mplayer '#{url}' -really-quiet")
     end
   end
 
@@ -94,10 +97,18 @@ class Music
   end
 
   def streams
-    [
-      'http://ant-kra-01.cdn.eurozet.pl:8606/'
+    {
+      nil => 'http://ant-kra-01.cdn.eurozet.pl:8606/',
+      'antyradio' => 'http://94.23.89.48:7300/',
+      'roxyfm' => 'http://lodz.radio.pionier.net.pl:8000/pl/roxyfm.ogg',
+      'zloteprzeboje' => 'http://lodz.radio.pionier.net.pl:8000/pl/zloteprzeboje.ogg',
+      'trojka' => 'http://stream.polskieradio.pl/program3',
+      'eskarock' => 'http://s3.deb1.scdn.smcloud.net/t008-1.mp3',
+      'eskaalt' => 'http://s3.deb1.scdn.smcloud.net/t015-1.mp3',
+      'zetrock' => 'http://zetrok-02.cdn.eurozet.pl:8448/',
+      'mpd' => 'http://bzium:8000/'
       #'http://stream.polskieradio.pl/program3'
-    ]
+    }
   end
 
   protected
@@ -116,12 +127,14 @@ class Music
   end
 end
 
-music = Music.new
 
-ka = Komoku::Agent.new server: 'ws://10.7.0.10:7272/', reconnect: true, async: true
+ka = Komoku::Agent.new server: 'ws://bzium:7272/', reconnect: true, async: true, timeout: 120, scope: 'kitchen'
 ka.connect
 ka.logger = Logger.new STDOUT
 ka.logger.level = Logger::INFO
+$ka = ka # yeah yeah
+
+music = Music.new
 
 ha = Hagent.new description, komoku_agent: ka
 
@@ -137,7 +150,7 @@ prs pcf
 1.times do
   %w{notify_green notify_red notify_blue}.each do |pin|
     ha.set pin, true
-    sleep 0.5 
+    sleep 0.5
     ha.set pin, false
   end
 end
@@ -174,13 +187,13 @@ end
 ha.direct_switch :sw_hood1, :hood1
 ha.direct_switch :sw_hood2, :hood2
 ha.direct_switch :sw_hood3, :hood3
-ha.direct_switch :sw_hood_light, :light_hood
+ha.direct_switch :sw_hood_light, :light_up
 
 ha.toggle_switch :sw_green, :light_neon
-ha.toggle_switch :sw_yellow, :light_up
+ha.toggle_switch :sw_yellow, :light_hood
 
 # Komoku outputs
-%i{light_up light_hood light_neon}.each do |output|
+%i{light_up light_hood}.each do |output|
   # sync with komoku on boot
   ha.set(output, !!ka.get(output))
 
@@ -189,10 +202,19 @@ ha.toggle_switch :sw_yellow, :light_up
 
   # keep state from komoku
   ka.on_change(output) do |key, curr, prev|
-    ha.set output, curr if ha.last_set(output) != curr
+    ha.without_callbacks do
+      ha.set(output, curr) if ha.last_set(output) != curr
+    end
   end
 end
 
+ka.on_change(:light_neon) do |key, curr, prev|
+  if curr == true
+    `/root/tmp/rpi1/RF24/RPi/RF24/examples/remote -m 1`
+  else
+    `/root/tmp/rpi1/RF24/RPi/RF24/examples/remote -m 0`
+  end
+end
 
 ha.on_change :sw_red do
   if music.playing?
@@ -209,6 +231,11 @@ ha.on_change :sw_red do
   end
 end
 
+ka.on_change(:radio_station) do |key, curr, prev|
+  ka.put :radio_on, false
+  ka.put :radio_on, true
+end
+
 ka.on_change(:radio_on) do |key, curr, prev|
   if curr && !music.playing?
     music.start
@@ -223,25 +250,25 @@ end
 
 sleep
 
-exit 0
+#exit 0
 
-pcf.on_change do |oldstate|
-  puts "change"
-end
-pcf.pin(6).on_change do
-  puts "pin 6 change [#{pcf.pin(6).value}]"
-  pcf.pin(0).set pcf.pin(6).value
-end
-
-#loop do
-#  puts ds.read
+#pcf.on_change do |oldstate|
+  #puts "change"
+#end
+#pcf.pin(6).on_change do
+  #puts "pin 6 change [#{pcf.pin(6).value}]"
+  #pcf.pin(0).set pcf.pin(6).value
 #end
 
-20.times do
-  %w{o1 o2 o3 o4}.each do |pin|
-    ha.set pin, true
-    sleep 0.02
-    ha.set pin, false
-  end
-end
+##loop do
+##  puts ds.read
+##end
+
+#20.times do
+  #%w{o1 o2 o3 o4}.each do |pin|
+    #ha.set pin, true
+    #sleep 0.02
+    #ha.set pin, false
+  #end
+#end
 

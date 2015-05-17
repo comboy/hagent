@@ -29,7 +29,8 @@ description = {
     light_hall: ard_light.light(1),
     status_green: pcf.pin(7),
     bath_vent: ard_vent.vent,
-    bath_vent_shutter: ard_vent.shutter
+    bath_vent_shutter: ard_vent.shutter,
+    bath_led_blue: ard_vent.led_blue
   },
 
   sensors: {
@@ -55,8 +56,9 @@ puts "HA state:"
 ap ha.state
 ha.debug_inputs
 
-ha.set :bath_vent_shutter, false
-ha.set :bath_vent, false
+sploosh = ( ha.read(:bath_hum_shower) > 90 )
+ha.set :bath_vent_shutter, sploosh
+ha.set :bath_vent, sploosh
 # Heartbeat light
 Thread.new do loop do
   ha.set :status_green, true; sleep 0.1; ha.set :status_green, false; sleep 0.1
@@ -86,6 +88,24 @@ end
   ha.on_change(sensor) do
     value = ha.read sensor, cache: false
     ka.put sensor, value
+  end
+end
+
+Catcher.thread "bath hum light" do
+  loop do
+    Catcher.block "bath hum light block" do
+      hum =  ha.read :bath_hum_shower
+      if hum && hum > 60
+        ha.set :bath_led_blue,  true
+        sleep 0.1
+        ha.set :bath_led_blue,  false
+        sleep( (100 - hum) / 10.0 )
+      else
+        sleep 1
+      end
+      next 
+    end
+    sleep 2
   end
 end
 

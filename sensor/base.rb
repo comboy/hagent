@@ -1,3 +1,5 @@
+require 'timeout'
+
 class Hagent
   module Sensor
     class Base
@@ -13,10 +15,11 @@ class Hagent
 
         @on_change_blocks = []
         @opts[:read_interval] ||= 2
+        @opts[:read_timeout] ||= 30
 
         Catcher.thread "#{name} reads" do
           loop do
-            value = read_sensor
+            value = safe_read_sensor
             if @last_read != value
               if !@opts[:smoothing] || (value != @prev_last_read)
                 # make last_read assignment in case on change blocks want that value
@@ -39,7 +42,15 @@ class Hagent
       end
 
       def read
-        @last_read || read_sensor
+        @last_read || safe_read_sensor
+      end
+
+      protected
+
+      def safe_read_sensor
+        Timeout.timeout(@opts[:read_timeout]) { read_sensor }
+      rescue Timeout::Error
+        nil
       end
 
     end

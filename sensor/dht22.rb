@@ -12,6 +12,7 @@ class Hagent
       protected
  
       def read_sensor
+        return nil # FIXME
         # FIXME proper path
         response = `python vendor/AdafruitDHT.py 22 #{@pin}`
         response.split('Humidity=').last[0..-2].to_f

@@ -12,7 +12,8 @@ require 'rpi'
 class Hagent
 
   DEFAULT_OPTS = {
-    cache_time: 5
+    cache_time: 5,
+    set_timeout: 120
   }
 
   def initialize(description, opts = {})
@@ -32,7 +33,8 @@ class Hagent
     name = name.to_sym
 
     if @desc[:outputs].keys.include? name
-      @desc[:outputs][name].set value
+
+      Timeout.timeout(@opts[:set_timeout]) { @desc[:outputs][name].set value }
       @last_set[name] = value
 
       if !Thread.current[:hagent_without_callbacks] && @on_set_blocks[name]
