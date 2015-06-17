@@ -1,5 +1,6 @@
 require_relative 'hagent'
 require_relative '../komoku/komoku-core/lib/komoku/agent'
+require 'pp'
 
 
 pcf = Hagent::PCF8574.new(addr: '0x20', int: 27) # TODO which INT, int: 0)
@@ -201,15 +202,16 @@ ha.toggle_switch :sw_yellow, :light_hood
   ha.on_set(output) {|value| ka.put output, value}
 
   # keep state from komoku
-  ka.on_change(output) do |key, curr, prev|
+  ka.on_change(output) do |c|
+    pp c
     ha.without_callbacks do
-      ha.set(output, curr) if ha.last_set(output) != curr
+      ha.set(output, c[:value]) if ha.last_set(output) != c[:value]
     end
   end
 end
 
-ka.on_change(:light_neon) do |key, curr, prev|
-  if curr == true
+ka.on_change(:light_neon) do |c|
+  if c[:value] == true
     `/root/tmp/rpi1/RF24/RPi/RF24/examples/remote -m 1`
   else
     `/root/tmp/rpi1/RF24/RPi/RF24/examples/remote -m 0`
@@ -231,21 +233,21 @@ ha.on_change :sw_red do
   end
 end
 
-ka.on_change(:radio_station) do |key, curr, prev|
+ka.on_change(:radio_station) do
   ka.put :radio_on, false
   ka.put :radio_on, true
 end
 
-ka.on_change(:radio_on) do |key, curr, prev|
-  if curr && !music.playing?
+ka.on_change(:radio_on) do |c|
+  if c[:value] && !music.playing?
     music.start
   else
     music.stop
   end
 end
 
-ka.on_change(:radio_volume) do |key, curr, prev|
-  system("amixer set PCM #{curr}%")
+ka.on_change(:radio_volume) do |c|
+  system("amixer set PCM #{c[:value]}%")
 end
 
 sleep

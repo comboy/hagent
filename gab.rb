@@ -1,7 +1,7 @@
-
 require_relative 'hagent'
 require_relative '../komoku/komoku-core/lib/komoku/agent'
 require 'ard_vent'
+require 'pp'
 
 ds_door = Hagent::Sensor::DS18B20.new(addr: '28-0000032ebf4f')
 ds_rpi = Hagent::Sensor::DS18B20.new(addr: '28-00000550d6a2')
@@ -75,9 +75,10 @@ ha.toggle_switch :light_hall_switch, :light_hall
   ha.on_set(output) {|value| ka.put output, value}
 
   # keep state from komoku
-  ka.on_change(output) do |key, curr, prev|
+  ka.on_change(output) do |c|
+    puts "CHANGE: #{c}"
     ha.without_callbacks do
-      ha.set(output, curr) if ha.last_set(output) != curr
+      ha.set(output, c[:value]) if ha.last_set(output) != c[:value]
     end
   end
 end
@@ -103,7 +104,7 @@ Catcher.thread "bath hum light" do
       else
         sleep 1
       end
-      next 
+      next
     end
     sleep 2
   end
@@ -126,6 +127,9 @@ ha.on_change(:bath_hum_shower) do
   end
 end
 
+ka.on_change('.test.bath.vent_shutter') {|c| ha.set(:bath_vent_shutter, c[:value])}
+ka.on_change('.test.bath.vent') {|c| ha.set(:bath_vent, c[:value])}
+ka.on_change('.test.bath.led_blue') {|c| ha.set(:bath_led_blue, c[:value])}
 
 last_away = Time.now
 ha.on_change(:pir) do
@@ -133,11 +137,45 @@ ha.on_change(:pir) do
   #puts "pir: #{state}"
   if state
     puts "pir away: #{Time.now - last_away}"
-    if ha.read(:bri) < 70 && !ha.last_set(:light)
+    if ha.read(:bri) < 70 && !ha.last_set(:light) && ka.lazy_get(:auto_light)
       ha.set :light, true
     end
   else
     last_away = Time.now
+  end
+end
+
+# TODO finally do room modules
+
+
+# flipping light switch 4 times enables / disables auto light mode
+lst = [] # light switch times
+ha.on_change(:light_switch) do
+  lst.unshift Time.now
+  lst = lst[0..5]
+  next if lst.size < 4
+  dts_ok = true
+  3.times do |i|
+    dt = lst[i] - lst[i+1]
+    dts_ok = false if dt > 0.5
+  end
+  next unless dts_ok
+  # we got a sequence
+  lst = []
+  if ka.lazy_get(:auto_light)
+    ka.put :auto_light, false
+    ha.set :buzzer, true
+    sleep 0.1
+    ha.set :buzzer, false
+  else
+    ka.put :auto_light, true
+    ha.set :buzzer, true
+    sleep 0.05
+    ha.set :buzzer, false
+    sleep 0.1
+    ha.set :buzzer, true
+    sleep 0.05
+    ha.set :buzzer, false
   end
 end
 

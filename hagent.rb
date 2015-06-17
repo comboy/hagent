@@ -1,13 +1,19 @@
+require 'bundler/setup'
+
 require 'catcher'
 require 'awesome_print'
 
 $: << "."
-require 'pcf8574'
-require 'sensor/ds18b20'
-require 'sensor/dht22'
-require 'sensor/light'
-require 'ard_light'
-require 'rpi'
+
+require_relative 'hagent/generic_input'
+
+require_relative 'pcf8574'
+require_relative 'sensor/ds18b20'
+require_relative 'sensor/dht22'
+require_relative 'sensor/light'
+require_relative 'ard_light'
+require_relative 'rpi'
+
 
 class Hagent
 
@@ -140,7 +146,7 @@ class Hagent
       name = name.to_sym
       pin.on_change do
         state = read name
-        puts "DS: #{name} = #{state}"
+        puts "[#{Time.now}] DS: #{name} = #{state}"
       end
     end
   end

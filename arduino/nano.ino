@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include "Adafruit_MCP23017.h"
+#include <Metro.h>
 
 Adafruit_MCP23017 mcp;
 Adafruit_MCP23017 mcp2;
@@ -13,6 +14,20 @@ unsigned long lastPress = -1;
 int keys[] = {6, 12, 4, 0, 15, 7, 3, 13, 5, 1, 2, 14};
 //            0  1   2  3  4   5  6  7   8  9  #  *
 
+// 8 9 10 11
+int pinVoltage = A2;
+int spkState = 0;
+
+//int ledOrange = 3;
+//int ledGreen = 2;
+//int ledRed = 4;
+int ledHeart = 4;
+int ledOk = 2; 
+Metro metroHeart = Metro(250);
+Metro metroOk = Metro(250);
+int ledHeartState = 0;
+int ledOkState = 1;
+
 void setup() {
   mcp.begin();      // use default address 0
   mcp2.begin(4);
@@ -21,9 +36,12 @@ void setup() {
     mcp.pinMode(i, INPUT);
     mcp.pullUp(i, HIGH);  // turn on a 100K pullup internally
     led_states[i] = 1;
-    mcp2.pinMode(i, OUTPUT);
-    mcp2.digitalWrite(i, LOW);
+    if (i < 12) {
+      mcp2.pinMode(keys[i], OUTPUT);
+      mcp2.digitalWrite(keys[i], LOW);
+    }
   }
+  mcp2.pinMode(11, OUTPUT);
 
 
 //  delay(3100);
@@ -33,12 +51,14 @@ void setup() {
   Serial.begin(9600);
 
   pinMode(13, OUTPUT);  // use the p13 LED as debugging
+  pinMode(ledHeart, OUTPUT);
+  pinMode(ledOk, OUTPUT);
 }
 
 void releaseButton() {
-  for (int i=0; i<16; i++) {
+  for (int i=0; i<12; i++) {
    //if (pressedButton != -1) {
-     mcp2.digitalWrite(i, LOW);
+     mcp2.digitalWrite(keys[i], LOW);
    //}
   }
   pressedButton = -1;
@@ -92,6 +112,10 @@ void loop() {
         pressButton(11);
         rpl = '@';
         break;
+      case 'v':
+        Serial.print('v');
+        Serial.print(analogRead(pinVoltage));
+        rpl = '.'; 
       default:
         if (sig >= '0' && sig <= '9') {
           pressButton(sig - '0');
@@ -101,6 +125,9 @@ void loop() {
         }
     }
     Serial.print((char)rpl);
+    //Serial.print("mm:");
+    //Serial.println(mcp2.digitalRead(11));
+ 
     /*
     if (sig == '.') {
       Serial.print('.');
@@ -118,6 +145,39 @@ void loop() {
       releaseButton();
     }
   }
+
+  // heartbeat led
+  if (metroHeart.check() == 1) {
+    if (ledHeartState == 0) {
+      ledHeartState = 1;
+      digitalWrite(ledHeart, HIGH);
+      metroHeart.interval(100);
+    } else {
+      ledHeartState = 0;
+      digitalWrite(ledHeart, LOW);
+      metroHeart.interval(100);
+    }
+  }
+
+  // OK led
+  if (metroOk.check() == 1) {
+    if (ledOkState == 0) {
+      ledOkState = 1;
+      digitalWrite(ledOk, HIGH);
+      metroOk.interval(100);
+    } else {
+      ledOkState = 0;
+      digitalWrite(ledOk, LOW);
+      metroOk.interval(700);
+    }
+  }
+  
+  int spk = mcp2.digitalRead(11);
+  if (spk != spkState) {
+    spkState = spk;
+    Serial.print(spk ? "S" : "s");
+  }
+
   delay(10);
 }
 

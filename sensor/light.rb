@@ -12,6 +12,7 @@ class Hagent
       protected
  
       def read_sensor
+        return 0
         `gpio -g mode #{@pin} out`
         `gpio -g write #{@pin} 0`
         sleep 0.1

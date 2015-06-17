@@ -17,20 +17,18 @@ class Hagent
         @opts[:read_interval] ||= 2
         @opts[:read_timeout] ||= 30
 
-        Catcher.thread "#{name} reads" do
-          loop do
-            value = safe_read_sensor
-            if @last_read != value
-              if !@opts[:smoothing] || (value != @prev_last_read)
-                # make last_read assignment in case on change blocks want that value
-                @prev_last_read = @last_read
-                @last_read = value
-                @on_change_blocks.each {|b| b.call }
-              end
+        Catcher.thread_loop "#{name} reads" do
+          value = safe_read_sensor
+          if @last_read != value
+            if !@opts[:smoothing] || (value != @prev_last_read)
+              # make last_read assignment in case on change blocks want that value
+              @prev_last_read = @last_read
+              @last_read = value
+              @on_change_blocks.each {|b| b.call }
             end
-            sleep @opts[:read_interval]
           end
-        end
+          sleep @opts[:read_interval]
+        end unless @opts[:read_interval] == 0
       end
 
       def name
@@ -43,6 +41,10 @@ class Hagent
 
       def read
         @last_read || safe_read_sensor
+      end
+
+      def read_sensor
+        raise "implement me!"
       end
 
       protected

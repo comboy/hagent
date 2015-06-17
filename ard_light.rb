@@ -24,33 +24,7 @@ class Hagent
       end
     end
 
-    class Switch
-      def initialize(number)
-        @number = number
-        @on_change_blocks = []
-      end
-
-      def read
-        @value
-      end
-
-      def mode=(mode)
-        raise "that's an input" unless mode == :input
-        true
-      end
-
-      def on_change(&block)
-        @on_change_blocks << block
-      end
-
-      def value=(value)
-        @value = value
-        @on_change_blocks.each {|b| b.call }
-      end
-
-      def value
-        @value
-      end
+    class Switch < GenericInput
     end
 
     class Light
@@ -135,7 +109,7 @@ class Hagent
     end
 
     def switch(num)
-      @switches[num] ||= Switch.new num
+      @switches[num] ||= Switch.new
     end
 
     def set_light(num, state)

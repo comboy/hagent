@@ -12,7 +12,7 @@ int swPins[] = {
 };
 
 // because why bother soldering it correctly
-bool reverseFix[] = {false, false, false, true};
+bool reverseFix[] = {false, false, false, false};
 
 int swState[swCount];
 int outState[swCount];

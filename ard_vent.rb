@@ -20,6 +20,7 @@ class Hagent
         @rf = opts.delete :rf
         @command = opts.delete :command
         opts[:read_interval] ||= 30
+        opts[:read_timeout] = 180
         super
       end
 
