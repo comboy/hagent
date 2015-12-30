@@ -41,8 +41,6 @@ class Hagent
       end
     end
 
-    attr_accessor :state
-
     def initialize(opts = {})
       @addr = opts[:addr] || '0x20'
       @i2cbus = opts[:i2cbus] || 1
@@ -58,7 +56,7 @@ class Hagent
             loop do
               `gpio -g wfi #{@int} both`
               prev_state = @state
-              sleep 0.01
+              #sleep 0.01
               @state = read_state
               if @state != prev_state # in case many PCFs are connected to single interrupt
                 Catcher.thread "pcf on change blocks" do
@@ -78,6 +76,10 @@ class Hagent
       @pins[number]
     end
 
+    def state
+      @int ? @state : read_state
+    end
+
     def read_state
       raw = ex "i2cget -y #{@i2cbus} #{@addr}"
       state = raw.split('x').last.to_i(16)
@@ -94,7 +96,6 @@ class Hagent
       value = !value
       new_state = @state
       new_state = @state ^ 1 << pin if ((@state & 1 << pin) > 0) != value
-      #puts "oldstate: #{@state}, newstate: #{new_state}"
       write_state(new_state)
     end
 

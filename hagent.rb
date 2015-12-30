@@ -12,6 +12,7 @@ require_relative 'sensor/ds18b20'
 require_relative 'sensor/dht22'
 require_relative 'sensor/light'
 require_relative 'ard_light'
+require_relative 'ard_door'
 require_relative 'rpi'
 
 

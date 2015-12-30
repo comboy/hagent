@@ -129,10 +129,12 @@ class Music
 end
 
 
-ka = Komoku::Agent.new server: 'ws://bzium:7272/', reconnect: true, async: true, timeout: 120, scope: 'kitchen'
+ka = Komoku::Agent.new server: 'wss://komoku:7273/', reconnect: true, async: true, timeout: 120, scope: 'kitchen'
 ka.connect
 ka.logger = Logger.new STDOUT
 ka.logger.level = Logger::INFO
+ka.define_keys('alive' => {type: 'uptime', max_time: 100})
+
 $ka = ka # yeah yeah
 
 music = Music.new
@@ -245,9 +247,18 @@ ka.on_change(:radio_on) do |c|
     music.stop
   end
 end
+ka.on_change('.mol.internet', init: true) do |c|
+  ha.set :notify_red, !c[:value]
+end
 
 ka.on_change(:radio_volume) do |c|
   system("amixer set PCM #{c[:value]}%")
+end
+
+# stayin alive
+Catcher.thread_loop("stayin alive") do
+  ka.put 'alive', true
+  sleep 60
 end
 
 sleep
