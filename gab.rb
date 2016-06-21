@@ -124,6 +124,7 @@ end
 ha.on_change(:bath_hum_shower) do
   hum = ha.read :bath_hum_shower
   puts "bath hum shower: #{hum}"
+  next # TODO disabled for mesz
   next unless hum
   if hum > 94
     ha.set(:bath_vent, true) if ha.last_set(:bath_vent) != true

@@ -23,6 +23,27 @@ class Hagent
     set_timeout: 120
   }
 
+  # Dummy pin so that you can plag anything to it
+  class Pin
+    def initialize(state = nil)
+      @state = state
+      @on_set = (value) -> {}
+    end
+
+    def on_set(&block)
+      @on_set = block
+    end
+
+    def read
+      @state
+    end
+
+    def set(value)
+      @state = value
+      @on_set.call(value)
+    end
+  end
+
   def initialize(description, opts = {})
     @desc = {inputs: {}, outputs: {}, sensors: {}}.merge description
     @last_values = {}
